@@ -1,0 +1,125 @@
+[data-component="nura"] {
+  --nura-size: 32px;
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: var(--nura-size);
+  height: var(--nura-size);
+  isolation: isolate;
+  user-select: none;
+}
+
+[data-component="nura"] [data-slot="nura-face"] {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 0 6px rgba(124, 92, 255, 0.4));
+}
+
+/* Aurora halo behind the badge. */
+[data-component="nura"]::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  z-index: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 34%, rgba(124, 92, 255, 0.55), transparent 62%),
+    radial-gradient(circle at 68% 68%, rgba(34, 211, 238, 0.38), transparent 64%),
+    radial-gradient(circle at 62% 30%, rgba(232, 121, 249, 0.26), transparent 58%);
+  filter: blur(calc(var(--nura-size) * 0.09));
+  opacity: 0.7;
+}
+
+[data-component="nura"][data-animated="true"] [data-slot="nura-face"] {
+  animation: nura-float 5.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+[data-component="nura"][data-animated="true"]::before {
+  animation: nura-aurora 4.2s ease-in-out infinite;
+}
+
+/* Eyelids match the dark face so a quick scale reveals a closed-eye blink. */
+[data-component="nura"] [data-slot="nura-lid"] {
+  position: absolute;
+  z-index: 2;
+  top: 44.9%;
+  width: 3.1%;
+  height: 4.7%;
+  border-radius: 50%;
+  background: #0d0527;
+  transform: scaleY(0);
+  transform-origin: center top;
+  pointer-events: none;
+}
+
+[data-component="nura"] [data-slot="nura-lid"][data-side="left"] {
+  left: 39.4%;
+}
+
+[data-component="nura"] [data-slot="nura-lid"][data-side="right"] {
+  left: 46.4%;
+}
+
+[data-component="nura"][data-animated="true"] [data-slot="nura-lid"] {
+  animation: nura-blink 7.2s ease-in-out infinite;
+}
+
+@keyframes nura-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6%) scale(1.015);
+  }
+}
+
+@keyframes nura-aurora {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes nura-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(0);
+  }
+  92.5%,
+  94.5% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-component="nura"] [data-slot="nura-face"],
+  [data-component="nura"]::before,
+  [data-component="nura"] [data-slot="nura-lid"] {
+    animation: none !important;
+  }
+
+  [data-component="nura"] [data-slot="nura-lid"] {
+    display: none;
+  }
+}
+
+:root[data-motion="reduce"] [data-component="nura"] [data-slot="nura-face"],
+:root[data-motion="reduce"] [data-component="nura"]::before,
+:root[data-motion="reduce"] [data-component="nura"] [data-slot="nura-lid"] {
+  animation: none !important;
+}
+
+:root[data-motion="reduce"] [data-component="nura"] [data-slot="nura-lid"] {
+  display: none;
+}

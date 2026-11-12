@@ -1,0 +1,383 @@
+[data-component="first-launch-splash"] [data-component="neuratal-wordmark"] img {
+  /* The wordmark is a raster lockup now; reveal it left-to-right instead of drawing paths. */
+  animation: first-launch-wordmark-draw 1000ms ease-out both;
+}
+
+[data-component="first-launch-splash"][data-drawing="pending"] [data-component="neuratal-wordmark"] img {
+  animation-play-state: paused;
+}
+
+@keyframes first-launch-wordmark-draw {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* ========================================================
+   Neuratal Aurora — startup splash (non-first-launch)
+   ======================================================== */
+
+.startup-splash {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(120% 90% at 70% -10%, rgba(124, 92, 255, 0.30) 0%, transparent 55%),
+    radial-gradient(80% 70% at -10% 110%, rgba(34, 211, 238, 0.18) 0%, transparent 55%),
+    radial-gradient(70% 60% at 100% 100%, rgba(124, 92, 255, 0.16) 0%, transparent 60%),
+    #05060a;
+}
+
+.startup-splash__aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Slow-drifting aurora blobs */
+.startup-splash__blob {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 999px;
+  filter: blur(120px);
+  opacity: 0.55;
+  will-change: transform;
+  mix-blend-mode: screen;
+}
+
+.startup-splash__blob--a {
+  top: -160px;
+  left: -140px;
+  background: radial-gradient(circle, #7c5cff 0%, transparent 70%);
+  animation: startup-blob-drift-a 18s ease-in-out infinite alternate;
+}
+
+.startup-splash__blob--b {
+  bottom: -180px;
+  right: -160px;
+  background: radial-gradient(circle, #22d3ee 0%, transparent 70%);
+  animation: startup-blob-drift-b 22s ease-in-out infinite alternate;
+}
+
+.startup-splash__blob--c {
+  top: 40%;
+  left: 55%;
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, #f5b841 0%, transparent 70%);
+  opacity: 0.22;
+  animation: startup-blob-drift-c 26s ease-in-out infinite alternate;
+}
+
+@keyframes startup-blob-drift-a {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(120px, 80px, 0) scale(1.12);
+  }
+  100% {
+    transform: translate3d(60px, 140px, 0) scale(1.05);
+  }
+}
+
+@keyframes startup-blob-drift-b {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-140px, -60px, 0) scale(1.1);
+  }
+  100% {
+    transform: translate3d(-80px, -140px, 0) scale(1.18);
+  }
+}
+
+@keyframes startup-blob-drift-c {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.18;
+  }
+  50% {
+    transform: translate3d(-120px, 40px, 0) scale(1.2);
+    opacity: 0.28;
+  }
+  100% {
+    transform: translate3d(-60px, -80px, 0) scale(1.08);
+    opacity: 0.22;
+  }
+}
+
+/* Starfield + grid overlays */
+.startup-splash__stars,
+.startup-splash__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.startup-splash__stars {
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 22%, rgba(255, 255, 255, 0.9) 50%, transparent 50%),
+    radial-gradient(1.2px 1.2px at 78% 12%, rgba(255, 255, 255, 0.7) 50%, transparent 50%),
+    radial-gradient(1.8px 1.8px at 58% 58%, rgba(255, 255, 255, 0.8) 50%, transparent 50%),
+    radial-gradient(1px 1px at 28% 74%, rgba(255, 255, 255, 0.6) 50%, transparent 50%),
+    radial-gradient(1.6px 1.6px at 88% 70%, rgba(255, 255, 255, 0.75) 50%, transparent 50%),
+    radial-gradient(1px 1px at 42% 36%, rgba(255, 255, 255, 0.55) 50%, transparent 50%),
+    radial-gradient(1.3px 1.3px at 65% 84%, rgba(255, 255, 255, 0.7) 50%, transparent 50%);
+  background-repeat: no-repeat;
+  animation: startup-stars-twinkle 7s ease-in-out infinite alternate;
+}
+
+@keyframes startup-stars-twinkle {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.startup-splash__grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+}
+
+/* Content column */
+.startup-splash__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 32px;
+}
+
+/* Nura wrap + rotating aurora rings */
+.startup-splash__nura-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 200px;
+  height: 200px;
+}
+
+.startup-splash__ring {
+  position: absolute;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  will-change: transform, opacity;
+}
+
+.startup-splash__ring--outer {
+  inset: 0;
+  border-top-color: #7c5cff;
+  border-right-color: #22d3ee;
+  box-shadow:
+    0 0 24px rgba(124, 92, 255, 0.35),
+    inset 0 0 24px rgba(124, 92, 255, 0.25);
+  animation: startup-ring-spin 9s linear infinite;
+}
+
+.startup-splash__ring--inner {
+  inset: 18px;
+  border-bottom-color: #7c5cff;
+  border-left-color: #22d3ee;
+  opacity: 0.85;
+  animation: startup-ring-spin-reverse 13s linear infinite;
+}
+
+@keyframes startup-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes startup-ring-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.startup-splash__nura {
+  position: relative;
+  z-index: 1;
+  user-select: none;
+  filter: drop-shadow(0 0 28px rgba(124, 92, 255, 0.45));
+  animation: startup-nura-breathe 4.2s ease-in-out infinite;
+}
+
+@keyframes startup-nura-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 24px rgba(124, 92, 255, 0.42));
+  }
+  50% {
+    transform: scale(1.035);
+    filter: drop-shadow(0 0 36px rgba(124, 92, 255, 0.6));
+  }
+}
+
+/* Wordmark (raster) */
+.startup-splash__wordmark {
+  max-width: 320px;
+  width: 100%;
+  opacity: 0.95;
+}
+
+/* Loading row: pulsing dots only; no hard-coded copy. */
+.startup-splash__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.startup-splash__loading-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.startup-splash__loading-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #22d3ee;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.8);
+  animation: startup-dot-pulse 1.3s ease-in-out infinite;
+}
+
+.startup-splash__loading-dot--b {
+  background: #7c5cff;
+  box-shadow: 0 0 8px rgba(124, 92, 255, 0.8);
+  animation-delay: 0.15s;
+}
+
+.startup-splash__loading-dot--c {
+  background: #f5b841;
+  box-shadow: 0 0 8px rgba(245, 184, 65, 0.8);
+  animation-delay: 0.3s;
+}
+
+@keyframes startup-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.55);
+    opacity: 1;
+  }
+}
+
+/* Progress track: deterministic-looking loop */
+.startup-splash__track {
+  position: relative;
+  width: 280px;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.startup-splash__bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7c5cff, #22d3ee, #f5b841);
+  background-size: 200% 100%;
+  animation: startup-bar-slide 2.6s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(124, 92, 255, 0.6);
+}
+
+.startup-splash__bar--ghost {
+  left: auto;
+  right: 0;
+  width: 28%;
+  opacity: 0.55;
+  background: linear-gradient(90deg, #22d3ee, #7c5cff);
+  background-size: 200% 100%;
+  animation: startup-bar-slide-reverse 3.4s ease-in-out infinite;
+}
+
+@keyframes startup-bar-slide {
+  0% {
+    transform: translateX(-130%);
+    background-position: 0% 0;
+  }
+  55% {
+    transform: translateX(210%);
+    background-position: 100% 0;
+  }
+  100% {
+    transform: translateX(210%);
+    background-position: 100% 0;
+  }
+}
+
+@keyframes startup-bar-slide-reverse {
+  0% {
+    transform: translateX(130%);
+    background-position: 0% 0;
+  }
+  55% {
+    transform: translateX(-230%);
+    background-position: 100% 0;
+  }
+  100% {
+    transform: translateX(-230%);
+    background-position: 100% 0;
+  }
+}
+
+/* Legacy first-launch */
+@media (prefers-reduced-motion: reduce) {
+  [data-component="first-launch-splash"] [data-component="neuratal-wordmark"] img {
+    animation: none;
+    opacity: 1;
+    clip-path: none;
+  }
+
+  .startup-splash__blob,
+  .startup-splash__stars,
+  .startup-splash__ring--outer,
+  .startup-splash__ring--inner,
+  .startup-splash__nura,
+  .startup-splash__loading-dot,
+  .startup-splash__loading-dot--b,
+  .startup-splash__loading-dot--c,
+  .startup-splash__bar,
+  .startup-splash__bar--ghost {
+    animation: none !important;
+  }
+
+  .startup-splash__bar {
+    left: 0;
+    width: 60%;
+  }
+
+  .startup-splash__bar--ghost {
+    display: none;
+  }
+}

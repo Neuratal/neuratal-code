@@ -1,0 +1,1689 @@
+@import "@opencode/ui/styles/tailwind";
+@import "@opencode/session-ui/styles";
+@import "@opencode/ui/styles/tokens";
+@import "tw-animate-css";
+
+/* Set on the timeline viewport and changed on every frame while the composer region grows. Neither inherits, so a change
+   restyles the viewport alone instead of every row inside it. */
+@property --session-timeline-inset {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --session-timeline-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@font-face {
+  font-family: "JetBrainsMono Nerd Font Mono";
+  src: url("/assets/JetBrainsMonoNerdFontMono-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* The terminal draws bold cells with a bold canvas font. */
+@font-face {
+  font-family: "JetBrainsMono Nerd Font Mono";
+  src: url("/assets/JetBrainsMonoNerdFontMono-Bold.woff2") format("woff2");
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/assets/Inter.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+/* Text covers every weight below bold, so only bold syntax tokens and markup load the Bold face. */
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("@ibm/plex/IBM-Plex-Mono/fonts/complete/woff2/IBMPlexMono-Text.woff2") format("woff2");
+  font-weight: 100 599;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("@ibm/plex/IBM-Plex-Mono/fonts/complete/woff2/IBMPlexMono-Bold.woff2") format("woff2");
+  font-weight: 600 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("@ibm/plex/IBM-Plex-Mono/fonts/complete/woff2/IBMPlexMono-TextItalic.woff2") format("woff2");
+  font-weight: 100 599;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Panel motion sets this on the one element whose own layout reads it. An inherited property would restyle every
+   element under that element each time a flight starts or lands. */
+@property --panel-hold-width {
+  syntax: "*";
+  inherits: false;
+}
+
+@media (display-mode: standalone) {
+  /* WebKit excludes safe-area insets from dvh in installed apps. */
+  #root {
+    height: 100vh;
+  }
+}
+
+/* iOS can report navigator.standalone without matching display-mode. */
+#root[data-standalone="true"] {
+  height: 100vh;
+}
+
+@layer components {
+  [data-slot="session-chat-panel"][data-scrollbar-hidden="true"]
+    [data-slot="session-timeline-visible"]
+    .scroll-view__thumb {
+    visibility: hidden;
+  }
+
+  /* The timeline scrolls on under the composer region, passing behind its floating pill, and fades out as it reaches
+     the region's opaque card. A mask fades the content itself, so the edge works over any theme's background;
+     smoothstep stops avoid a visible horizon. */
+  [data-slot="session-timeline-scroll"] > .scroll-view__viewport {
+    --session-timeline-fade-start: var(--session-timeline-inset, 0px);
+    scroll-padding-bottom: var(--session-timeline-inset, 0px);
+    mask-image: linear-gradient(
+      to top,
+      transparent var(--session-timeline-fade-start),
+      rgb(0 0 0 / 0.16) calc(var(--session-timeline-fade-start) + 5px),
+      rgb(0 0 0 / 0.5) calc(var(--session-timeline-fade-start) + 10px),
+      rgb(0 0 0 / 0.84) calc(var(--session-timeline-fade-start) + 15px),
+      #000 calc(var(--session-timeline-fade-start) + 20px)
+    );
+  }
+
+  /* The review panel's visible width, which the header fade below tracks while the panel animates. Its fixed-width
+     content holds nothing else that reads it. */
+  #review-panel,
+  #bottom-panel {
+    container-type: inline-size;
+  }
+
+  /* Like the composer toolbar, fade only clipped content without reserving layout space.
+     The fade contracts as overflow clears; the second mask preserves the header divider. */
+  #review-panel .session-review-v2-tabs-bar {
+    --session-review-header-fade: clamp(0px, calc(100% - 100cqi), 24px);
+    mask-image:
+      linear-gradient(
+        to right,
+        #000 calc(100cqi - 40px - var(--session-review-header-fade)),
+        transparent calc(100cqi - 40px)
+      ),
+      linear-gradient(to top, #000 1px, transparent 1px);
+
+    &:dir(rtl) {
+      mask-image:
+        linear-gradient(
+          to left,
+          #000 calc(100cqi - 40px - var(--session-review-header-fade)),
+          transparent calc(100cqi - 40px)
+        ),
+        linear-gradient(to top, #000 1px, transparent 1px);
+    }
+  }
+
+  ::highlight(timeline-search-hit) {
+    background-color: color-mix(in srgb, var(--v2-icon-icon-accent) 28%, transparent);
+  }
+
+  ::highlight(timeline-search-hit-active) {
+    background-color: var(--v2-icon-icon-accent);
+    color: var(--v2-background-bg-deep);
+  }
+
+  [data-component="menu-v2-content"].desktop-app-menu {
+    min-width: 170px;
+    padding: 6px;
+    border-radius: 20px !important;
+  }
+
+  [data-component="menu-v2-content"].desktop-app-menu:not(.desktop-app-menu-sub) {
+    width: 170px;
+  }
+
+  [data-component="menu-v2-content"].desktop-app-menu-sub {
+    width: max-content;
+    min-width: 240px;
+    max-width: min(320px, calc(100vw - 24px));
+    padding: 6px;
+    border-radius: 20px !important;
+  }
+
+  [data-component="menu-v2-content"].desktop-app-menu [data-slot="menu-v2-group-label"] {
+    display: flex;
+    align-items: center;
+    height: 18px;
+    margin-bottom: 2px;
+    padding: 0 12px;
+    font-size: var(--font-size-x-small);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+    color: var(--text-weak);
+  }
+
+  [data-component="menu-v2-content"].desktop-app-menu [data-component="menu-v2-item"] {
+    min-height: 30px;
+    padding: 0 12px;
+    gap: 8px;
+    border-radius: 12px !important;
+    font-weight: var(--font-weight-regular);
+    line-height: 1;
+  }
+
+  [data-component="menu-v2-content"].desktop-app-menu [data-slot="menu-v2-item-content"] {
+    white-space: nowrap;
+  }
+
+  [data-component="menu-v2-content"].desktop-app-menu [data-slot="menu-v2-item-shortcut"] {
+    margin-left: auto;
+    color: var(--text-weak);
+    font-size: var(--font-size-x-small);
+    font-weight: var(--font-weight-regular);
+    white-space: nowrap;
+  }
+
+  .home-session-group-header::before {
+    content: "";
+    position: absolute;
+    top: -12px;
+    left: 0;
+    width: 100%;
+    height: 12px;
+    background: var(--v2-background-bg-base);
+  }
+
+  .home-session-group-header::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    height: 16px;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      var(--v2-background-bg-base) 0%,
+      color-mix(in srgb, var(--v2-background-bg-base) 92.0456%, transparent) 7.93%,
+      color-mix(in srgb, var(--v2-background-bg-base) 84.9947%, transparent) 14.14%,
+      color-mix(in srgb, var(--v2-background-bg-base) 78.6813%, transparent) 19%,
+      color-mix(in srgb, var(--v2-background-bg-base) 72.9394%, transparent) 22.85%,
+      color-mix(in srgb, var(--v2-background-bg-base) 67.6028%, transparent) 26.05%,
+      color-mix(in srgb, var(--v2-background-bg-base) 62.5055%, transparent) 28.95%,
+      color-mix(in srgb, var(--v2-background-bg-base) 57.4815%, transparent) 31.91%,
+      color-mix(in srgb, var(--v2-background-bg-base) 52.3647%, transparent) 35.27%,
+      color-mix(in srgb, var(--v2-background-bg-base) 46.989%, transparent) 39.4%,
+      color-mix(in srgb, var(--v2-background-bg-base) 41.1884%, transparent) 44.65%,
+      color-mix(in srgb, var(--v2-background-bg-base) 34.7969%, transparent) 51.36%,
+      color-mix(in srgb, var(--v2-background-bg-base) 27.6484%, transparent) 59.9%,
+      color-mix(in srgb, var(--v2-background-bg-base) 19.5767%, transparent) 70.62%,
+      color-mix(in srgb, var(--v2-background-bg-base) 10.416%, transparent) 83.87%,
+      transparent 100%
+    );
+  }
+
+  [data-slot="titlebar-update-loader"] {
+    display: block;
+    flex-shrink: 0;
+    margin: 1px;
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    border: 2px solid color-mix(in srgb, var(--v2-icon-icon-accent) 30%, transparent);
+    border-top-color: var(--v2-icon-icon-accent);
+    animation: titlebar-update-loader-spin 0.67s linear infinite;
+    transform-origin: 50% 50%;
+  }
+
+  :root[data-motion="reduce"] {
+    [data-slot="titlebar-update-loader"] {
+      animation: none;
+    }
+  }
+
+  @keyframes titlebar-update-loader-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes home-projects-fade-top {
+    from {
+      visibility: hidden;
+    }
+    to {
+      visibility: visible;
+    }
+  }
+
+  @keyframes home-projects-fade-bottom {
+    from {
+      visibility: visible;
+    }
+    to {
+      visibility: hidden;
+    }
+  }
+
+  @keyframes session-dropzone-enter {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes session-dropzone-content-enter {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.96);
+    }
+  }
+
+  @keyframes session-dropzone-upload-enter {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.92);
+    }
+  }
+
+  @keyframes session-dropzone-stripes-drift {
+    to {
+      background-position: 33.941px 0;
+    }
+  }
+
+  [data-component="session-dropzone"][data-visible="true"] {
+    animation: session-dropzone-enter 200ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+
+  [data-component="session-dropzone"][data-visible="true"] [data-slot="session-dropzone-content"] {
+    animation: session-dropzone-content-enter 200ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+
+  [data-component="session-dropzone"][data-visible="true"] [data-slot="session-dropzone-upload"] {
+    animation: session-dropzone-upload-enter 240ms cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+
+  [data-component="session-dropzone"][data-visible="true"] [data-slot="session-dropzone-stripes"] {
+    animation: session-dropzone-stripes-drift 3s linear infinite;
+  }
+
+  [data-component="session-dropzone"] {
+    --session-dropzone-wash: 4%;
+    --session-dropzone-stripe: 7%;
+    --session-dropzone-card: var(--v2-background-bg-base);
+  }
+
+  [data-color-scheme="dark"] [data-component="session-dropzone"] {
+    --session-dropzone-wash: 6%;
+    --session-dropzone-stripe: 14%;
+    --session-dropzone-card: var(--v2-background-bg-layer-01);
+  }
+
+  [data-component="timeline-quote"] {
+    background-color: var(--v2-background-bg-base);
+  }
+
+  [data-color-scheme="dark"] [data-component="timeline-quote"] {
+    background-color: var(--v2-background-bg-layer-01);
+  }
+
+  :root[data-motion="reduce"] {
+    [data-component="session-dropzone"][data-visible="true"],
+    [data-component="session-dropzone"][data-visible="true"] [data-slot="session-dropzone-content"],
+    [data-component="session-dropzone"][data-visible="true"] [data-slot="session-dropzone-upload"],
+    [data-component="session-dropzone"][data-visible="true"] [data-slot="session-dropzone-stripes"] {
+      animation: none;
+    }
+  }
+
+  [data-slot="home-projects-scroll"] {
+    timeline-scope: --home-projects-scroll;
+  }
+
+  [data-slot="manage-models-scroll"] {
+    timeline-scope: --manage-models-scroll;
+  }
+
+  [data-slot="home-projects-scroll"]::before,
+  [data-slot="home-projects-scroll"]::after,
+  [data-slot="manage-models-scroll"]::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    height: 16px;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  [data-slot="home-projects-scroll"]::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--v2-background-bg-base), transparent);
+  }
+
+  [data-slot="manage-models-scroll"]::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--v2-background-bg-base), transparent);
+  }
+
+  [data-slot="home-projects-scroll"]::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--v2-background-bg-base), transparent);
+  }
+
+  @supports (animation-timeline: --home-projects-scroll) and (timeline-scope: --home-projects-scroll) {
+    [data-slot="home-projects-viewport"] {
+      scroll-timeline: --home-projects-scroll y;
+    }
+
+    [data-slot="home-projects-scroll"]::before {
+      animation: home-projects-fade-top linear both;
+      animation-timeline: --home-projects-scroll;
+      animation-range: 0 0.1px;
+    }
+
+    [data-slot="home-projects-scroll"]::after {
+      animation: home-projects-fade-bottom linear both;
+      animation-timeline: --home-projects-scroll;
+      animation-range: calc(100% - 1.1px) calc(100% - 1px);
+    }
+  }
+
+  @supports (animation-timeline: --manage-models-scroll) and (timeline-scope: --manage-models-scroll) {
+    [data-slot="manage-models-scroll"] .settings-panel {
+      scroll-timeline: --manage-models-scroll y;
+    }
+
+    [data-slot="manage-models-scroll"]::before {
+      animation: home-projects-fade-top linear both;
+      animation-timeline: --manage-models-scroll;
+      animation-range: 0 0.1px;
+    }
+  }
+
+  :root body [data-slot="session-turn-diffs-header"] {
+    height: 24px;
+    padding-block: 0;
+  }
+}
+
+/* ==========================================================================
+   Neuratal Code — Neuratal Aurora & OLED Brand Design System
+   ========================================================================== */
+
+:root {
+  --nrtl-bg: #000000;
+  --nrtl-surface: #0B0B0C;
+  --nrtl-surface-high: #141416;
+  --nrtl-border: #1E1E20;
+  --nrtl-border-glow: rgba(124, 92, 255, 0.35);
+
+  --nrtl-primary: #7C5CFF;
+  --nrtl-primary-glow: #22D3EE;
+  --nrtl-primary-dim: #5B3FD9;
+  --nrtl-primary-fade: rgba(124, 92, 255, 0.08);
+
+  --nrtl-gold: #F5B841;
+  --nrtl-mint: #22D3EE;
+  --nrtl-danger: #F87171;
+  --nrtl-warning: #FBBF24;
+  --nrtl-success: #7C5CFF;
+
+  --nrtl-text: #F4F4F5;
+  --nrtl-text-muted: #8A8F98;
+  --nrtl-text-dim: #525660;
+
+  /* Model Accents */
+  --color-akisame: #4F7CFF;
+  --color-kazahana: #7C5CFF;
+  --color-hatsukaze: #F5B841;
+}
+
+[data-theme="neuratal"] {
+  --background-base: #000000;
+  --surface-base: #000000;
+  --surface-raised-base: #0B0B0C;
+  --surface-raised-base-hover: #141416;
+  --border-weak-base: #1E1E20;
+  --border-weaker-base: #141416;
+}
+
+/* Subtle Aurora Glow utility */
+.nrtl-glow {
+  box-shadow: 0 0 20px rgba(124, 92, 255, 0.25);
+}
+
+.nrtl-glow-sm {
+  box-shadow: 0 0 10px rgba(124, 92, 255, 0.18);
+}
+
+.nrtl-border-glow {
+  border-color: rgba(124, 92, 255, 0.4) !important;
+  box-shadow: 0 0 12px rgba(124, 92, 255, 0.2);
+}
+
+/* Agent pulse animation */
+@keyframes nrtl-agent-pulse {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(124, 92, 255, 0.6));
+  }
+  50% {
+    opacity: 0.65;
+    filter: drop-shadow(0 0 2px rgba(124, 92, 255, 0.2));
+  }
+}
+
+.nrtl-agent-working {
+  animation: nrtl-agent-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nrtl-agent-working {
+    animation: none;
+  }
+}
+
+/* ========================================================
+   NEURATAL DESIGN SYSTEM: NEURATAL AURORA & OLED THEME
+   ======================================================== */
+:root, [data-theme="neuratal"] {
+  --v2-primary-base: #7C5CFF;
+  --v2-accent-base: #22D3EE;
+  --v2-interactive-base: #7C5CFF;
+  --v2-border-border-focus: #7C5CFF !important;
+  --v2-background-bg-accent: #7C5CFF !important;
+  --v2-text-text-accent: #7C5CFF !important;
+  --v2-text-text-accent-hover: #22D3EE !important;
+  --v2-icon-icon-accent: #7C5CFF !important;
+  
+  --interactive-base: #7C5CFF !important;
+  --interactive-hover: #22D3EE !important;
+  --focus-ring: #7C5CFF !important;
+  --accent-base: #7C5CFF !important;
+
+  --primary-base: #7C5CFF !important;
+  --primary-hover: #22D3EE !important;
+}
+
+/* Composer Container in New Session */
+[data-component="new-session"] [data-component="composer"] {
+  border: 1px solid rgba(124, 92, 255, 0.3) !important;
+  background: #0B0B0C !important;
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.7), 0 0 16px rgba(124, 92, 255, 0.08) !important;
+  border-radius: 22px !important;
+  /* Narrowed from `all`: only border and shadow change on focus. */
+  transition: border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+[data-component="new-session"] [data-component="composer"]:focus-within {
+  border-color: rgba(124, 92, 255, 0.65) !important;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.8), 0 0 24px rgba(124, 92, 255, 0.22) !important;
+}
+
+/* Composer Action Buttons */
+[data-component="composer"] [data-action="composer-model"],
+[data-component="composer"] [data-action="prompt-project"] {
+  color: #7C5CFF !important;
+  transition: color 0.15s ease-in-out !important;
+}
+
+[data-component="composer"] [data-action="composer-model"]:hover,
+/* ==========================================================================
+   NEURATAL CODE — UNIFIED GLASSMORPHISM & DESIGN SYSTEM
+   ========================================================================== */
+
+:root {
+  --nrtl-radius-3xl: 32px;
+  --nrtl-radius-2xl: 26px;
+  --nrtl-radius-xl: 20px;
+  --nrtl-radius-lg: 16px;
+  --nrtl-radius-md: 12px;
+  --nrtl-radius-sm: 8px;
+  --nrtl-radius-xs: 6px;
+  --nrtl-cyan: #7C5CFF;
+  --nrtl-cyan-glow: rgba(124, 92, 255, 0.25);
+  --nrtl-glass-bg: rgba(9, 12, 16, 0.92);
+  --nrtl-glass-border: rgba(124, 92, 255, 0.22);
+  --nrtl-glass-shadow: 0 24px 60px -10px rgba(0, 0, 0, 0.88), 0 0 40px -5px rgba(124, 92, 255, 0.16);
+}
+
+/* OLED Black Base & Clean High-Resolution Ambient Glow */
+body {
+  background-color: #000000 !important;
+  background-image: radial-gradient(circle 900px at 50% -10%, rgba(124, 92, 255, 0.07) 0%, transparent 65%),
+                    radial-gradient(circle 700px at 85% 90%, rgba(34, 211, 238, 0.04) 0%, transparent 55%) !important;
+}
+
+/* Global Consistent Radius & Glassmorphism */
+[data-component="dialog-v2"] [data-slot="dialog-container"],
+.modal-window,
+[data-slot="dialog-content"] {
+  border-radius: var(--nrtl-radius-2xl) !important;
+  background: var(--nrtl-glass-bg) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid var(--nrtl-glass-border) !important;
+  box-shadow: var(--nrtl-glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Menus, Popovers, Flyouts & Dropdowns */
+[data-component="menu-v2-content"],
+[data-slot="popover-content"],
+[data-slot="model-dialog-flyout"],
+.dropdown-menu {
+  border-radius: var(--nrtl-radius-xl) !important;
+  background: rgba(10, 14, 20, 0.94) !important;
+  backdrop-filter: blur(26px) saturate(180%) !important;
+  border: 1px solid var(--nrtl-glass-border) !important;
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.88), 0 0 30px -5px rgba(124, 92, 255, 0.15) !important;
+}
+
+[data-component="menu-v2-item"],
+.dropdown-item {
+  border-radius: var(--nrtl-radius-md) !important;
+  /* Narrowed from `all`: only background changes on hover. */
+  transition: background-color 140ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+[data-component="menu-v2-item"]:hover,
+[data-component="menu-v2-item"][data-highlighted] {
+  background: rgba(124, 92, 255, 0.14) !important;
+  color: #7C5CFF !important;
+}
+
+/* Inputs & Form Controls */
+input[type="text"],
+input[type="search"],
+input[type="password"],
+input[type="email"],
+textarea,
+[data-component="text-input-v2"] {
+  border-radius: var(--nrtl-radius-lg) !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease !important;
+}
+
+input:focus:not(.model-dialog input),
+textarea:focus,
+[data-component="text-input-v2"]:focus-within:not(.model-dialog [data-component="text-input-v2"]) {
+  border-color: #7C5CFF !important;
+  box-shadow: 0 0 0 2px rgba(124, 92, 255, 0.25), 0 0 10px rgba(124, 92, 255, 0.12) !important;
+}
+
+/* Button Micro-Interactions */
+button,
+[role="button"] {
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 180ms ease,
+              background-color 180ms ease,
+              border-color 180ms ease,
+              opacity 140ms ease;
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+/* Primary Button Styling */
+button[data-variant="primary"],
+.btn-primary {
+  background: linear-gradient(135deg, #7C5CFF 0%, #06B6D4 100%) !important;
+  color: #000000 !important;
+  font-weight: 650 !important;
+  border-radius: var(--nrtl-radius-md) !important;
+  box-shadow: 0 0 18px rgba(124, 92, 255, 0.4) !important;
+}
+
+button[data-variant="primary"]:hover,
+.btn-primary:hover {
+  box-shadow: 0 0 26px rgba(124, 92, 255, 0.65) !important;
+  filter: brightness(1.05);
+}
+
+/* Composer Floating Glass Card. The backdrop blur was recomputed every time the timeline
+   behind the composer changed, which made scrolling and streaming text stutter. */
+[data-component="composer"] {
+  border-radius: var(--nrtl-radius-2xl) !important;
+  background: rgba(9, 12, 16, 0.96) !important;
+  border: 1px solid rgba(124, 92, 255, 0.25) !important;
+  box-shadow: 0 24px 60px -10px rgba(0, 0, 0, 0.88), 0 0 35px -5px rgba(124, 92, 255, 0.15) !important;
+}
+
+[data-component="composer"] [data-action="prompt-project"]:hover {
+  background: rgba(124, 92, 255, 0.12) !important;
+}
+
+[data-component="composer"] button[type="submit"],
+[data-component="composer"] [data-slot="composer-submit"] {
+  background: linear-gradient(135deg, #7C5CFF 0%, #0891B2 100%) !important;
+  color: #000000 !important;
+  box-shadow: 0 0 16px rgba(124, 92, 255, 0.45) !important;
+  border: none !important;
+  border-radius: var(--nrtl-radius-md) !important;
+  font-weight: 700 !important;
+}
+
+[data-component="composer"] button[type="submit"]:hover,
+[data-component="composer"] [data-slot="composer-submit"]:hover {
+  box-shadow: 0 0 24px rgba(124, 92, 255, 0.75) !important;
+  transform: translateY(-1px);
+}
+
+/* Titlebar & Tabs */
+[data-titlebar-tab][data-active="true"] {
+  border-bottom: 2px solid #7C5CFF !important;
+  color: #FFFFFF !important;
+}
+
+[data-titlebar-tab][data-active="true"] [data-slot="tab-icon"],
+[data-titlebar-tab][data-active="true"] svg {
+  color: #7C5CFF !important;
+}
+
+/* Smooth Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 92, 255, 0.65);
+  box-shadow: 0 0 10px rgba(124, 92, 255, 0.5);
+}
+
+/* Selection */
+::selection {
+  background-color: rgba(124, 92, 255, 0.35) !important;
+  color: #FFFFFF !important;
+}
+
+/* Neuratal Model Specific Badges */
+[data-model-id="akisame"] {
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  color: #4F7CFF !important;
+}
+
+[data-model-id="kazahana"] {
+  border-color: rgba(124, 92, 255, 0.5) !important;
+  color: #7C5CFF !important;
+}
+
+[data-model-id="hatsukaze"] {
+  border-color: rgba(245, 184, 65, 0.4) !important;
+  color: #F5B841 !important;
+}
+
+/* Sidebar Panels & Dividers */
+[data-slot="sidebar-header"],
+[data-slot="vertical-tabs-sidebar"] {
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Utility Accents & Shimmer */
+.nrtl-glow {
+  box-shadow: 0 0 25px rgba(124, 92, 255, 0.3) !important;
+}
+
+.nrtl-text-gradient {
+  background: linear-gradient(135deg, #7C5CFF 0%, #22D3EE 50%, #FFFFFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ==========================================================================
+   NEURATAL CODE ANIMATION ENGINE (60 FPS FLUID MOTION & FADES)
+   ========================================================================== */
+
+@keyframes nrtl-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nrtl-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes nrtl-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: nrtl-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-out {
+  animation: nrtl-fade-out 200ms ease both;
+}
+
+.animate-scale-in {
+  animation: nrtl-scale-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Dialog Backdrop & Card Entrance/Exit Animations */
+@keyframes nrtl-dialog-backdrop-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(16px);
+  }
+}
+
+@keyframes nrtl-dialog-backdrop-out {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(16px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+}
+
+@keyframes nrtl-dialog-card-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(-12px);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes nrtl-dialog-card-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.94) translateY(-10px);
+    filter: blur(3px);
+  }
+}
+
+.nrtl-dialog-backdrop-enter {
+  animation: nrtl-dialog-backdrop-in 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.nrtl-dialog-backdrop-exit {
+  animation: nrtl-dialog-backdrop-out 180ms ease forwards;
+}
+
+.nrtl-dialog-card-enter {
+  animation: nrtl-dialog-card-in 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.nrtl-dialog-card-exit {
+  animation: nrtl-dialog-card-out 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Studio Workspace Fade In upon Login */
+@keyframes nrtl-studio-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.nrtl-studio-enter {
+  animation: nrtl-studio-fade-in 360ms ease-out both;
+}
+
+:root[data-motion="reduce"] .nrtl-studio-enter {
+  animation: none;
+}
+
+/* Auth Screen Exit Animation */
+@keyframes nrtl-auth-screen-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.02);
+    filter: blur(5px);
+  }
+}
+
+.nrtl-auth-screen-exit {
+  animation: nrtl-auth-screen-out 320ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* ==========================================================================
+   NEURATAL CODE — AUTH SCREEN (WELCOME BACK)
+   ========================================================================== */
+
+@keyframes nrtl-auth-card-in {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.96);
+    filter: blur(10px);
+  }
+  65% {
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes nrtl-auth-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nrtl-auth-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nrtl-auth-alert-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes nrtl-auth-mark-breathe {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(124, 92, 255, 0.55)) drop-shadow(0 0 20px rgba(34, 211, 238, 0.22));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(34, 211, 238, 0.7)) drop-shadow(0 0 26px rgba(124, 92, 255, 0.4));
+  }
+}
+
+@keyframes nrtl-auth-aurora-a {
+  0%,
+  100% {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes nrtl-auth-aurora-b {
+  0%,
+  100% {
+    transform: translate3d(3%, 2%, 0) scale(1.04);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate3d(-4%, -3%, 0) scale(1);
+    opacity: 0.9;
+  }
+}
+
+@keyframes nrtl-auth-halo {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+@keyframes nrtl-auth-sheen {
+  to {
+    transform: translateX(150%) skewX(-14deg);
+  }
+}
+
+@keyframes nrtl-auth-social-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.82);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.035);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.nrtl-auth-card {
+  animation: nrtl-auth-card-in 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.nrtl-auth-reveal {
+  animation: nrtl-auth-reveal 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.nrtl-auth-view {
+  animation: nrtl-auth-view-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.nrtl-auth-alert {
+  animation: nrtl-auth-alert-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.nrtl-auth-mark {
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  filter: drop-shadow(0 0 8px rgba(124, 92, 255, 0.55)) drop-shadow(0 0 20px rgba(34, 211, 238, 0.22));
+  animation: nrtl-auth-mark-breathe 5.5s ease-in-out infinite;
+}
+
+.nrtl-auth-aurora-a,
+.nrtl-auth-aurora-b {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.nrtl-auth-aurora-a {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(124, 92, 255, 0.2) 0%,
+    rgba(124, 92, 255, 0.08) 38%,
+    transparent 72%
+  );
+  animation: nrtl-auth-aurora-a 20s ease-in-out infinite;
+}
+
+.nrtl-auth-aurora-b {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(14, 116, 144, 0.22) 0%,
+    rgba(34, 211, 238, 0.06) 42%,
+    transparent 74%
+  );
+  animation: nrtl-auth-aurora-b 26s ease-in-out infinite;
+}
+
+.nrtl-auth-halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(124, 92, 255, 0.14) 0%, transparent 68%);
+  animation: nrtl-auth-halo 9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.nrtl-auth-grid {
+  background-image:
+    linear-gradient(to right, rgba(124, 92, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(124, 92, 255, 0.14) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse 78% 92% at 50% 0%, #000 18%, transparent 78%);
+  mask-image: radial-gradient(ellipse 78% 92% at 50% 0%, #000 18%, transparent 78%);
+}
+
+.nrtl-auth-page-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.22) 0.5px, transparent 0.5px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, #000 0%, transparent 76%);
+  mask-image: radial-gradient(ellipse 70% 65% at 50% 45%, #000 0%, transparent 76%);
+}
+
+.nrtl-auth-social {
+  animation: nrtl-auth-social-pop 560ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.nrtl-auth-social:nth-child(2) {
+  animation-delay: 70ms;
+}
+
+.nrtl-auth-social:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+.nrtl-auth-social-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  background: radial-gradient(circle at 50% 118%, rgba(124, 92, 255, 0.34) 0%, transparent 72%);
+}
+
+.nrtl-auth-social:hover .nrtl-auth-social-glow {
+  opacity: 1;
+}
+
+.nrtl-auth-social:focus-visible .nrtl-auth-social-glow {
+  opacity: 1;
+}
+
+.nrtl-auth-checkbox {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.nrtl-auth-eye:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
+.nrtl-auth-input {
+  width: 100%;
+  height: 49px;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.032);
+  padding: 0 15px;
+  color: #f4f4f5;
+  font-size: 13px;
+  line-height: 20px;
+  outline: none;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nrtl-auth-input:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.nrtl-auth-input::placeholder {
+  color: #565c66;
+}
+
+.nrtl-auth-input:focus {
+  border-color: rgba(124, 92, 255, 0.62);
+  background: rgba(124, 92, 255, 0.045);
+  box-shadow:
+    0 0 0 3px rgba(124, 92, 255, 0.1),
+    0 0 24px -6px rgba(124, 92, 255, 0.45);
+}
+
+.nrtl-auth-input--password {
+  padding-right: 46px;
+}
+
+.nrtl-auth-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  height: 50px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #22d3ee 0%, #7C5CFF 48%, #0fb8ad 100%);
+  color: #00110f;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow:
+    0 12px 32px -12px rgba(124, 92, 255, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition:
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms ease,
+    filter 200ms ease;
+}
+
+.nrtl-auth-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow:
+    0 16px 40px -12px rgba(124, 92, 255, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.nrtl-auth-cta:active:not(:disabled) {
+  transform: translateY(0) scale(0.988);
+}
+
+.nrtl-auth-cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.nrtl-auth-cta::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -60%;
+  width: 42%;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: translateX(-120%) skewX(-14deg);
+}
+
+.nrtl-auth-cta:hover:not(:disabled)::after {
+  animation: nrtl-auth-sheen 900ms ease;
+}
+
+.nrtl-auth-cta-ghost {
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 180ms ease,
+    color 180ms ease,
+    background 180ms ease;
+}
+
+.nrtl-auth-cta-ghost:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.nrtl-auth-cta-ghost:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nrtl-auth-card,
+  .nrtl-auth-reveal,
+  .nrtl-auth-view,
+  .nrtl-auth-alert,
+  .nrtl-auth-mark,
+  .nrtl-auth-aurora-a,
+  .nrtl-auth-aurora-b,
+  .nrtl-auth-halo {
+    animation: none !important;
+  }
+
+  .nrtl-auth-social {
+    animation: none !important;
+  }
+
+  .nrtl-auth-cta,
+  .nrtl-auth-cta-ghost,
+  .nrtl-auth-input,
+  .nrtl-auth-social,
+  .nrtl-auth-social-glow {
+    transition: none;
+  }
+
+  .nrtl-auth-cta::after {
+    display: none;
+  }
+}
+
+:root[data-motion="reduce"] .nrtl-auth-card,
+:root[data-motion="reduce"] .nrtl-auth-reveal,
+:root[data-motion="reduce"] .nrtl-auth-view,
+:root[data-motion="reduce"] .nrtl-auth-alert,
+:root[data-motion="reduce"] .nrtl-auth-mark,
+:root[data-motion="reduce"] .nrtl-auth-aurora-a,
+:root[data-motion="reduce"] .nrtl-auth-aurora-b,
+:root[data-motion="reduce"] .nrtl-auth-halo,
+:root[data-motion="reduce"] .nrtl-auth-social {
+  animation: none !important;
+}
+
+/* Glowing top ambient light shimmer */
+@keyframes nrtl-shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.nrtl-shimmer-bar {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(124, 92, 255, 0.2) 20%,
+    rgba(34, 211, 238, 0.9) 50%,
+    rgba(124, 92, 255, 0.2) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: nrtl-shimmer-sweep 4s linear infinite;
+}
+
+/* Universal Rounded Menus & Smooth Animations */
+[data-component="menu-v2-content"],
+[data-component="context-menu-content"],
+[data-component="context-menu-sub-content"],
+[data-component="popover-content"],
+[data-slot="popover-content"],
+[data-slot="menu-v2-content"],
+[data-slot="select-v2-content"],
+[data-slot="combobox-content"],
+[data-component="select-v2-content"] {
+  border-radius: 22px !important;
+  background: rgba(8, 12, 17, 0.94) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(124, 92, 255, 0.22) !important;
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.88), 0 0 30px -5px rgba(124, 92, 255, 0.15) !important;
+}
+
+[data-component="menu-v2-item"],
+[data-slot="menu-v2-item"],
+[data-slot="context-menu-item"],
+[data-slot="context-menu-checkbox-item"],
+[data-slot="context-menu-radio-item"],
+[data-slot="context-menu-sub-trigger"],
+[data-slot="select-v2-item"],
+[data-component="select-v2-item"],
+.palette-menu-row,
+[data-slot="search-list-row"] {
+  border-radius: 12px !important;
+  /* Narrowed from `all`: only background changes on hover. */
+  transition: background-color 140ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Dialogs & Modal Windows Soft Corners */
+[data-component="dialog-v2"] [data-slot="dialog-container"],
+[data-component="dialog"] [data-slot="dialog-container"],
+.modal-window,
+[data-slot="modal-content"] {
+  border-radius: 28px !important;
+  background: rgba(8, 12, 17, 0.94) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(124, 92, 255, 0.25) !important;
+  box-shadow: 0 30px 80px -15px rgba(0, 0, 0, 0.92), 0 0 45px -5px rgba(124, 92, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Tabs & Tab Strips */
+[data-titlebar-tab] {
+  border-radius: 14px !important;
+  /* Narrowed from `all`: only color-related properties change on active/hover. */
+  transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1), border-color 160ms cubic-bezier(0.16, 1, 0.3, 1), color 160ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Settings Panels & Cards */
+.settings-panel,
+[data-component="settings-card"],
+[data-slot="settings-card"] {
+  border-radius: 20px !important;
+}
+
+/* Toasts & Notifications */
+.toast-v2,
+[data-component="toast"],
+[data-sonner-toast] {
+  border-radius: 22px !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(124, 92, 255, 0.3) !important;
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.9), 0 0 25px rgba(124, 92, 255, 0.16) !important;
+}
+
+/* Micro-interaction for buttons */
+button:hover:not(:disabled),
+[role="button"]:hover:not([aria-disabled="true"]) {
+  transform: translateY(-0.5px);
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]) {
+  transform: scale(0.97) translateY(0);
+}
+
+/* Respect User Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Neuratal Studio chrome
+   The home deck, the session mission bar, and the command dock share one
+   language: deep surfaces, a single violet signal colour, and quiet rules.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.nrtl-deck {
+  border: 1px solid color-mix(in srgb, var(--v2-border-border-base) 58%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 2.5%, transparent),
+    0 22px 54px -34px rgba(0, 0, 0, 0.92);
+  background-image:
+    radial-gradient(90% 60% at 50% -20%, color-mix(in srgb, #7C5CFF 7%, transparent), transparent 62%),
+    radial-gradient(70% 50% at 100% 100%, color-mix(in srgb, #4F7CFF 5%, transparent), transparent 65%);
+  animation: nrtl-deck-enter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes nrtl-deck-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+:root[data-motion="reduce"] .nrtl-deck {
+  animation: none;
+}
+
+/* Main dock surfaces use the same dark hairline as the deck instead of the raised token's light ring. */
+.nrtl-surface {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--v2-border-border-base) 58%, transparent),
+    0 22px 54px -34px rgba(0, 0, 0, 0.92);
+  animation: nrtl-surface-fade-in 320ms ease-out both;
+}
+
+@keyframes nrtl-surface-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+:root[data-motion="reduce"] .nrtl-surface {
+  animation: none;
+}
+
+/* Session header: a slim mission bar instead of a bare title row. */
+.nrtl-mission-bar {
+  min-height: 42px;
+  padding-inline: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--v2-border-border-base) 72%, transparent);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--v2-background-bg-raised-base) 55%, var(--v2-background-bg-base)),
+    var(--v2-background-bg-base)
+  );
+  box-shadow: 0 1px 0 color-mix(in srgb, #7C5CFF 8%, transparent);
+}
+
+.nrtl-mission-bar::before {
+  content: "";
+  align-self: stretch;
+  width: 2px;
+  margin-block: 11px;
+  margin-inline-end: 8px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, #7C5CFF, color-mix(in srgb, #7C5CFF 10%, transparent));
+  box-shadow: 0 0 10px color-mix(in srgb, #7C5CFF 55%, transparent);
+}
+
+/* Composer: a labelled command dock. */
+.nrtl-command-dock {
+  position: relative;
+}
+
+.nrtl-dock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-inline: 4px;
+  font-size: 10.5px;
+  font-weight: 560;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--v2-text-text-muted);
+  user-select: none;
+}
+
+.nrtl-dock-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nrtl-dock-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #7C5CFF;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, #7C5CFF 14%, transparent),
+    0 0 10px color-mix(in srgb, #7C5CFF 65%, transparent);
+}
+
+.nrtl-dock-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  opacity: 0.62;
+}
+
+.nrtl-dock-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 4px;
+}
+
+.nrtl-dock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding-inline: 9px;
+  border: 1px solid color-mix(in srgb, var(--v2-border-border-base) 80%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--v2-background-bg-raised-base) 55%, transparent);
+  color: var(--v2-text-text-muted);
+  font-size: 11px;
+  font-weight: 510;
+  letter-spacing: -0.01em;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.nrtl-dock-chip:hover:not(:disabled) {
+  color: var(--v2-text-text-base);
+  border-color: color-mix(in srgb, #7C5CFF 45%, transparent);
+  background: color-mix(in srgb, #7C5CFF 8%, transparent);
+}
+
+.nrtl-dock-chip b {
+  font-weight: 600;
+  color: #7C5CFF;
+}
+
+.nrtl-dock-meta {
+  margin-inline-start: auto;
+  padding-inline-end: 4px;
+  font-size: 10px;
+  font-weight: 560;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v2-text-text-muted);
+  opacity: 0.55;
+}
+
+.nrtl-command-dock:focus-within .nrtl-dock-dot {
+  animation: nrtl-dock-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes nrtl-dock-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.nrtl-command-dock [data-component="composer"] {
+  border-radius: 16px;
+}
+
+.nrtl-command-dock:focus-within [data-component="composer"] {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #7C5CFF 35%, transparent),
+    0 22px 60px -38px color-mix(in srgb, #7C5CFF 90%, transparent);
+}
+
+@media (max-width: 767px) {
+  .nrtl-dock-hint {
+    display: none;
+  }
+
+  .nrtl-dock-meta {
+    display: none;
+  }
+}
+
+/* Titlebar context: one quiet line where the tab strip used to be. */
+.nrtl-title-context {
+  align-self: center;
+  height: 26px;
+  max-width: min(46vw, 560px);
+  padding-inline: 12px;
+  border: 1px solid color-mix(in srgb, var(--v2-border-border-base) 62%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--v2-background-bg-base) 42%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 4%, transparent);
+}
+
+/* Home: the recent flows bar reads as a section, not a floating search field. */
+.nrtl-sessions {
+  margin-top: 18px;
+}
+
+.nrtl-sessions-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nrtl-sessions-label {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v2-text-text-muted);
+  opacity: 0.8;
+}
+
+@media (max-width: 767px) {
+  .nrtl-title-context {
+    display: none;
+  }
+
+  .nrtl-sessions-label {
+    display: none;
+  }
+}
+
+/* Home: the empty deck never shouts. */
+.nrtl-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 160px;
+  margin-top: 8px;
+  padding: 28px 20px;
+  border: 1px dashed color-mix(in srgb, var(--v2-border-border-base) 70%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--v2-background-bg-base) 40%, transparent);
+}
+
+.nrtl-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, #7C5CFF 22%, transparent);
+  background: color-mix(in srgb, #7C5CFF 8%, transparent);
+  color: #7C5CFF;
+}
+
+.nrtl-empty-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nrtl-empty-copy h2 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--v2-text-text-base);
+}
+
+.nrtl-empty-copy p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--v2-text-text-muted);
+}
+
+
+

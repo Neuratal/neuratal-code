@@ -1,0 +1,30 @@
+/* Home shell: a persistent history rail beside the scrollable command deck. */
+
+.nrtl-home-layout {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.nrtl-home-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .nrtl-home-layout {
+    flex-direction: column;
+  }
+
+  .nrtl-home-main {
+    order: 0;
+  }
+
+  .nrtl-home-layout > [data-slot="home-rail"] {
+    order: 1;
+  }
+}

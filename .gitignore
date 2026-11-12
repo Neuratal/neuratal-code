@@ -1,0 +1,28 @@
+# Bağımlılıklar ve derleme çıktıları
+node_modules/
+dist/
+dist-node/
+out/
+build/
+target/
+.turbo/
+.cache/
+*.bun-build
+tsconfig.tsbuildinfo
+
+# Yerel ortam ve sırlar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# İşletim sistemi / editör artıkları
+.DS_Store
+Thumbs.db
+*.log
+
+# Packaging artifacts
+src/packages/desktop/dist/
+src/packages/desktop/out/
+src/packages/app/dist/
